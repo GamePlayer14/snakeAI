@@ -104,7 +104,7 @@ def evolve_with_monitor():
             population = []
             for gen in range(100):
                 pop_size = 50
-                step_limit = min(16 + total_apples * 4)
+                step_limit = min(40 + 20 * gen, 500)
                 print(f"[DEBUG] Generation {gen+1} using pop_size {pop_size}")
                 population = [ss.build_model(1603, 3) for _ in range(pop_size)]
                 print(f"[DEBUG] Generation {gen+1} starting with step_limit {step_limit}...")
