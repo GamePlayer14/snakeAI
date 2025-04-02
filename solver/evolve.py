@@ -1,140 +1,120 @@
-gs = None
-vis_root = None
-tiles = None
-sprites = None
-
-import tkinter as tk
-import threading
+import torch
 import numpy as np
-import tensorflow as tf
-import random
-
+import tkinter as tk
+from snake_ai_model import build_model, get_action, mutate_weights, clone_model
 from game.game_state import GameState
 from game.sprite_loader import load_sprites
 from game.screen_builder import buildScreen
-import snake_ai_model as ss
 
-# Toggle rendering ON/OFF
-RENDER_MODE = True
-last_best = None
+POP_SIZE = 50
+INPUT_SIZE = 1603  # 40x40 board + direction
+OUTPUT_SIZE = 3
+GENERATIONS = 20
+TOP_K = 10
 
-def mutate_weights(weights, mutation_rate=0.1):
-    new_weights = []
-    for w in weights:
-        noise = np.random.randn(*w.shape) * mutation_rate
-        new_weights.append(w + noise)
-    return new_weights
+RENDER = True  # Toggle this to False to disable visualization
+INITIAL_STEP_LIMIT = 40  # Starting step limit per snake
+STEP_BONUS_PER_APPLE = 80  # Steps added per apple eaten
 
-def evaluate_game(gs, steps, recent_heads=None, visited_tiles=None, turn_history=None):
-    visited = visited_tiles if visited_tiles else set(gs.snake)
-    score = 20
-    apples_eaten = len(gs.snake) - 3
-    if not gs.alive:
-        score -= 5
-    score += apples_eaten * 30
-    head_y, head_x = gs.snake[0]
-    apple_y, apple_x = gs.apple
+def evaluate_score(game_state, steps, visited_tiles, recent_heads=None):
+    score = 0
+    apples_eaten = len(game_state.snake) - 3
+
+    if not game_state.alive:
+        score -= 10
+
+    score += apples_eaten * 50
+
+    head_y, head_x = game_state.snake[0]
+    apple_y, apple_x = game_state.apple
     distance = abs(head_y - apple_y) + abs(head_x - apple_x)
-    score += (20-distance) * 0.2
-    score += len(visited) * 0.4
+    score += max(0, 20 - distance)
+
+    score += len(visited_tiles) * 0.5
+
+    score -= steps * 0.1
+
     if recent_heads:
-        unique_recent = len(set(recent_heads))
-        loop_penalty = (len(recent_heads) - unique_recent) * 1
-        score -= loop_penalty
+        unique_heads = len(set(recent_heads))
+        score -= (len(recent_heads) - unique_heads)*2
+
     return score
 
-def run_model(model, max_steps=0, generation=1):
-    global gs, vis_root, sprites, tiles
 
-    if RENDER_MODE:
-        if gs is None:
-            vis_root = tk.Tk()
-            vis_root.title("Snake Viewer")
-            vis_root.geometry("800x800")
-            vis_root.lift()
-            vis_root.attributes('-topmost', True)
-            vis_root.after_idle(vis_root.attributes, '-topmost', False)
-            vis_root, tiles = buildScreen(40, 40)
-            sprites = load_sprites(True, master=vis_root)
+def run_model(model, base_step_limit=INITIAL_STEP_LIMIT, gs_cache={}):
+    if RENDER:
+        if 'gs' not in gs_cache:
+            root, tiles = buildScreen(40, 40)
+            sprites = load_sprites(True, master=root)
             gs = GameState(tiles, (40, 40), sprites, render=True)
+            gs_cache['gs'] = gs
+            gs_cache['root'] = root
         else:
-            gs.reset()
+            gs = gs_cache['gs']
+            root = gs_cache['root']
     else:
-        sprites = load_sprites(False)
-        gs = GameState(None, (40, 40), sprites, render=False)
-        gs.reset()
+        if 'gs' not in gs_cache:
+            sprites = load_sprites(False)
+            gs = GameState(None, (40, 40), sprites, render=False)
+            gs_cache['gs'] = gs
+        else:
+            gs = gs_cache['gs']
 
+    gs.reset()
     steps = 0
+    step_limit = base_step_limit
+    initial_length = len(gs.snake)
     visited_tiles = set()
     recent_heads = []
-    if max_steps is None or max_steps <= 0:
-        max_steps = min(500, 40 + (20 * generation))
 
-    while gs.alive and steps < max_steps:
-        direction = ss.get_action(model, gs, (40,40))
+    while gs.alive and steps < step_limit:
+        prev_length = len(gs.snake)
+
+        direction = get_action(model, gs)
         gs.set_direction(direction)
         gs.step()
+        visited_tiles.add(gs.snake[0])
         recent_heads.append(gs.snake[0])
         if len(recent_heads) > 20:
             recent_heads.pop(0)
-        visited_tiles.add(gs.snake[0])
+
         steps += 1
-        if RENDER_MODE and vis_root:
-            vis_root.update()
 
-    final_score = evaluate_game(gs, steps, recent_heads, visited_tiles, gs.turn_history if hasattr(gs, 'turn_history') else None)
-    print("[DEBUG] run_model done with score:", final_score)
-    return final_score
+        if len(gs.snake) > prev_length:
+            step_limit += STEP_BONUS_PER_APPLE
 
-def evolve_with_monitor():
-    root = tk.Tk()
-    root.title("Evolution Monitor")
-    root.geometry("400x200")
+        if RENDER:
+            root.update()
 
-    info_label = tk.Label(root, text="Initializing...", font=("Arial", 14))
-    info_label.pack()
+        print('ran model')
+    return evaluate_score(gs, steps, visited_tiles, recent_heads)
 
-    canvas = tk.Canvas(root, width=300, height=50, bg='white')
-    canvas.pack(pady=10)
-    bar = canvas.create_rectangle(0, 0, 0, 50, fill='green')
+def evolve_population_with_monitor(info_label, root):
+    population = [build_model(INPUT_SIZE, OUTPUT_SIZE) for _ in range(POP_SIZE)]
 
-    def background():
-        print("[DEBUG] Background thread started")
-        try:
-            population = []
-            for gen in range(100):
-                pop_size = 50
-                step_limit = min(40 + 20 * gen, 500)
-                print(f"[DEBUG] Generation {gen+1} using pop_size {pop_size}")
-                population = [ss.build_model(1602, 3) for _ in range(pop_size)]
-                print(f"[DEBUG] Generation {gen+1} starting with step_limit {step_limit}...")
-                scores = [run_model(model, max_steps=step_limit, generation=gen+1) for model in population]
-                keep_top_n = min(5 + gen, 20)
-                top_scores_models = [(s, m) for s, m in zip(scores, population)]
-                top_models = [model for _, model in sorted(top_scores_models, key=lambda x: x[0], reverse=True)[:keep_top_n]]
+    for gen in range(GENERATIONS):
+        step_limit = INITIAL_STEP_LIMIT
+        scores = []
+        for model in population:
+            score = run_model(model, base_step_limit=step_limit)
+            step_limit = max(step_limit, INITIAL_STEP_LIMIT + (score - 3) * STEP_BONUS_PER_APPLE)
+            scores.append(score)
 
-                new_population = top_models[:]
-                while len(new_population) < 50:
-                    parent = random.choice(top_models)
-                    child = tf.keras.models.clone_model(parent)
-                    mutation_rate = max(0.02, 0.05 - gen * 0.003)
-                    child.set_weights(mutate_weights(parent.get_weights(), mutation_rate=mutation_rate))
-                    new_population.append(child)
+        top_models = [model for _, model in sorted(zip(scores, population), key=lambda x: x[0], reverse=True)[:TOP_K]]
 
-                population = new_population
-                best_score = max(scores)
+        new_population = top_models[:]
+        while len(new_population) < POP_SIZE:
+            parent = np.random.choice(top_models)
+            child = clone_model(parent)
+            mutate_weights(child)
+            new_population.append(child)
 
-                def update_ui():
-                    info_label.config(text=f"Generation: {gen+1} | Best Score: {best_score:.2f}")
-                    canvas.coords(bar, 0, 0, min(best_score * 5, 300), 50)
+        population = new_population
+        best_score = max(scores)
 
-                root.after(0, update_ui)
-                print(f"[DEBUG] Generation {gen+1} | Best Score: {best_score:.2f}")
-        except Exception as e:
-            print(f"[ERROR] Exception in evolution thread: {e}")
+        def update_label():
+            info_label.config(text=f"Generation: {gen+1} | Best Score: {best_score}")
+        root.after(0, update_label)
 
-    threading.Thread(target=background, daemon=True).start()
-    root.mainloop()
-
-if __name__ == "__main__":
-    evolve_with_monitor()
+        print(f"Generation {gen+1} | Best Score: {best_score}")
+        

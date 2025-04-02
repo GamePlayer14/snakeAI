@@ -16,7 +16,11 @@ import tensorflow as tf
 def run_snake_game(play_game: bool):
     # Headless Evolution Monitor
     if not play_game:
-        evo.evolve_with_monitor()
+        root = tk.Tk()
+        root.title("Evolution Monitor")
+        info_label = tk.Label(root, text="Initializing...", font=("Arial", 14))
+        info_label.pack()
+        evo.evolve_population_with_monitor(info_label, root)
         return
 
     # Game Mode (with GUI)
