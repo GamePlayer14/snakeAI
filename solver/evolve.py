@@ -30,16 +30,16 @@ def evaluate_game(gs, steps, recent_heads=None, visited_tiles=None, turn_history
     score = 20
     apples_eaten = len(gs.snake) - 3
     if not gs.alive:
-        score -= 10
-    score += apples_eaten * 10
+        score -= 5
+    score += apples_eaten * 30
     head_y, head_x = gs.snake[0]
     apple_y, apple_x = gs.apple
     distance = abs(head_y - apple_y) + abs(head_x - apple_x)
     score += (20-distance) * 0.2
-    #score += len(visited) * 0.4
+    score += len(visited) * 0.4
     if recent_heads:
         unique_recent = len(set(recent_heads))
-        loop_penalty = (len(recent_heads) - unique_recent) * 0.5
+        loop_penalty = (len(recent_heads) - unique_recent) * 1
         score -= loop_penalty
     return score
 
@@ -71,7 +71,7 @@ def run_model(model, max_steps=0, generation=1):
         max_steps = min(500, 40 + (20 * generation))
 
     while gs.alive and steps < max_steps:
-        direction = ss.get_action(model, gs)
+        direction = ss.get_action(model, gs, (40,40))
         gs.set_direction(direction)
         gs.step()
         recent_heads.append(gs.snake[0])
@@ -106,7 +106,7 @@ def evolve_with_monitor():
                 pop_size = 50
                 step_limit = min(40 + 20 * gen, 500)
                 print(f"[DEBUG] Generation {gen+1} using pop_size {pop_size}")
-                population = [ss.build_model(1603, 3) for _ in range(pop_size)]
+                population = [ss.build_model(1602, 3) for _ in range(pop_size)]
                 print(f"[DEBUG] Generation {gen+1} starting with step_limit {step_limit}...")
                 scores = [run_model(model, max_steps=step_limit, generation=gen+1) for model in population]
                 keep_top_n = min(5 + gen, 20)

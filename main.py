@@ -8,8 +8,8 @@ import threading
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'solver')))
-import snake_ai_model as ss
-import evolve as evo
+import solver.snake_ai_model as ss
+import solver.evolve as evo
 import numpy as np
 import tensorflow as tf
 
@@ -33,17 +33,17 @@ def run_snake_game(play_game: bool):
 
     gs = GameState(tiles, board_size, sprites, play_game)
 
-    def headless_loop():
-        generation = 1
-        best_score = 0
-        gs.reset()
+    # def headless_loop():
+    #     generation = 1
+    #     best_score = 0
+    #     gs.reset()
 
-        while gs.alive:
-            gs.step()
-            score = len(gs.snake)
-            if score > best_score:
-                best_score = score
-            sb.update_monitor(generation, best_score, info_label, root)
+    #     while gs.alive:
+    #         gs.step()
+    #         score = len(gs.snake)
+    #         if score > best_score:
+    #             best_score = score
+    #         sb.update_monitor(generation, best_score, info_label, root)
 
     def game_loop():
         try:

@@ -36,8 +36,8 @@ def get_features(game_state,  game_shape):
 
 from game.direction import relative_to_absolute
 
-def get_action(model, game_state):
-    features = get_features(game_state)
+def get_action(model, game_state, game_shape = (40,40)):
+    features = get_features(game_state, game_shape)
     prediction = model.predict(features.reshape(1, -1), verbose=0)
     relative_action = np.argmax(prediction)
     return relative_to_absolute(game_state.direction, relative_action)
@@ -47,6 +47,8 @@ def get_state(game_state, _0list):
     for y, x in game_state.snake:
         _0list[y][x] = i
         i -= 0.001
+    ax, ay = game_state.apple
+    _0list[ay][ax] = 2
     return _0list
         
 
