@@ -1,9 +1,8 @@
 import tkinter as tk
 
-def buildScreen(x, y):
+def buildScreen(board_size):
     tile_size = 20
-    XRange = x
-    YRange = y
+    XRange, YRange = board_size
     screenW = XRange * tile_size
     screenH = YRange * tile_size
 

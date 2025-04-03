@@ -13,19 +13,18 @@ import solver.evolve as evo
 import numpy as np
 import tensorflow as tf
 
-def run_snake_game(play_game: bool):
+def run_snake_game(play_game: bool, board_size):
     # Headless Evolution Monitor
     if not play_game:
         root = tk.Tk()
         root.title("Evolution Monitor")
         info_label = tk.Label(root, text="Initializing...", font=("Arial", 14))
         info_label.pack()
-        evo.evolve_population_with_monitor(info_label, root)
+        evo.evolve_population_with_monitor(info_label, root, board_size)
         return
-
+    
     # Game Mode (with GUI)
     tiles = None
-    board_size = (40, 40)
 
     if play_game:
         root, tiles = sb.buildScreen(*board_size)

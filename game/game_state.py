@@ -73,8 +73,8 @@ class GameState:
             not (0 <= new_head[1] < self.board_size[1]) or
             new_head in self.snake):
             self.alive = False
-            if self.render:
-                print("Game Over")
+            # if self.render:
+            #     print("Game Over")
             return
 
         self.snake.insert(0, new_head)
