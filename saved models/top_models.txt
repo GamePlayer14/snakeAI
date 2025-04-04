@@ -1,5 +1,10 @@
-11,saved models\model_score11_ep288.pth
-8,saved models\model_score8_ep266.pth
-7,saved models\model_score7_ep94.pth
-5,saved models\model_score5_ep22.pth
-4,saved models\model_score4_ep1.pth
+19,saved models\model_score19_ep1491.pth
+14,saved models\model_score14_ep1448.pth
+11,saved models\model_score11_ep1123.pth
+9,saved models\model_score9_ep993.pth
+8,saved models\model_score8_ep801.pth
+7,saved models\model_score7_ep553.pth
+6,saved models\model_score6_ep253.pth
+5,saved models\model_score5_ep109.pth
+4,saved models\model_score4_ep15.pth
+3,saved models\model_score3_ep0.pth

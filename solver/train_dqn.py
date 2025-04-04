@@ -22,7 +22,7 @@ BATCH_SIZE = 64
 MEMORY_SIZE = 10000
 MAX_EPISODES = 50000
 EPSILON_START = 1.0
-EPSILON_DECAY = 0.995
+EPSILON_DECAY = 0.999
 EPSILON_MIN = 0.00
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,8 +45,9 @@ def train():
     top_models = []
     print("Running on:", device)
 
+    episode = 0
     model = DQN(INPUT_SIZE, OUTPUT_SIZE).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    optimizer = optim.Adam(model.parameters(), lr=LR * (0.995 ** episode))
     loss_fn = nn.MSELoss()
     epsilon = EPSILON_START
     episode_scores = []
@@ -54,7 +55,7 @@ def train():
     episodes_no_improve = 0
     PATIENCE = 500  
     mx = MAX_EPISODES
-    for episode in range(1, MAX_EPISODES + 1):
+    while episode < MAX_EPISODES + 1:
 
         RM = RewardManager(generation = episode)
 
@@ -158,7 +159,7 @@ def train():
             print(f"🛑 Early stopping: No improvement for {PATIENCE} episodes.")
             episode = MAX_EPISODES
 
-
+        episode += 1
         print(f"Ep {episode} | Score: {len(gs.snake)} | Steps: {steps} | Eps: {epsilon:.3f}")
     
     with open(os.path.join(MODEL_DIR, "top_models.txt"), "w") as f:
