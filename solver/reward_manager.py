@@ -18,19 +18,18 @@ class RewardManager:
         if delta > 0:
             self.total_reward += delta * 5  # reward getting closer
         elif delta < 0:
-            self.total_reward += delta * 2  # penalize drifting away (note: delta is negative)
+            self.total_reward += delta * 3  # penalize drifting away (note: delta is negative)
     
         return delta
 
 
     def ate_apple(self):
         self.apple_eaten += 1
-        if self.generation > 5:
-            self.total_reward += (self.apple_eaten ** 2) * 75  # quadratic bonus
+        self.total_reward += 50  
         return self.apple_eaten
 
     def loop_penalty(self, repeated_tiles):
-        self.total_reward -= repeated_tiles * 2  # tune this
+        self.total_reward -= repeated_tiles * 3  # tune this
         return repeated_tiles
 
     def survival_bonus(self, steps):

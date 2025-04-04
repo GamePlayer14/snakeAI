@@ -6,6 +6,8 @@ import random
 
 from game.direction import DIRECTION_DELTAS, turn_left, turn_right
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class SnakeModel(nn.Module):
     def __init__(self, input_size, output_size=3):
         super(SnakeModel, self).__init__()
@@ -21,7 +23,7 @@ class SnakeModel(nn.Module):
         return F.softmax(self.output(x), dim=1)
 
 def build_model(input_size, output_size=3):
-    return SnakeModel(input_size, output_size)
+    return SnakeModel(input_size, output_size).to(device)
 
 def get_features(game_state):
     from game.direction import DIRECTION_DELTAS, turn_left, turn_right
@@ -67,6 +69,24 @@ def get_features(game_state):
     def is_apple_in_dir(vec):
         y, x = hy + vec[0], hx + vec[1]
         return float((y, x) == (ay, ax))
+    
+    def distance_to_obstacle(y, x, dy, dx, max_dist=10):
+        for dist in range(1, max_dist + 1):
+            ny, nx = y + dy * dist, x + dx * dist
+            if is_wall(ny, nx) or is_body(ny, nx):
+                return dist
+        return max_dist
+    
+    danger_ahead = distance_to_obstacle(hy, hx, dy, dx)
+    danger_left  = distance_to_obstacle(hy, hx, dy_l, dx_l)
+    danger_right = distance_to_obstacle(hy, hx, dy_r, dx_r)
+
+    # Normalize by max distance (let's say 10 tiles)
+    danger_features = [
+        danger_ahead / 10.0,
+        danger_left / 10.0,
+        danger_right / 10.0
+]
 
     apple_ahead = is_apple_in_dir(ahead_vec)
     apple_left  = is_apple_in_dir(left_vec)
@@ -85,7 +105,8 @@ def get_features(game_state):
         body_ahead, body_left, body_right,
         apple_ahead, apple_left, apple_right,
         apple_dx, apple_dy,
-        *dir_encoding
+        *dir_encoding,
+        *danger_features
     ], dtype=np.float32)
 
 
@@ -99,7 +120,7 @@ def get_action(model, game_state, epsilon = 0.0):
         move = random.randint(0,2)
     else:
         with torch.no_grad():
-            features = torch.tensor(get_features(game_state)).unsqueeze(0)
+            features = torch.tensor(get_features(game_state)).unsqueeze(0).to(device)
             prediction = model(features)
             move = torch.argmax(prediction).item()
 
@@ -121,3 +142,5 @@ def clone_model(model):
     new_model = SnakeModel(model.fc1.in_features)
     new_model.load_state_dict(model.state_dict())
     return new_model
+
+

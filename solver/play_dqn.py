@@ -3,17 +3,20 @@ from dqn_model import DQN, get_action
 from snake_ai_model import get_features
 from game.game_state import GameState
 from game.sprite_loader import load_sprites
+from train_dqn import get_best_model_path
+from config import INPUT_SIZE, OUTPUT_SIZE
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Settings ---
 BOARD_SIZE = (40, 40)
-INPUT_SIZE = 15   # or 15 if using simplified features
-OUTPUT_SIZE = 3
 MODEL_PATH = "dqn_snake.pth"
 
 def play_model():
     # Load model
-    model = DQN(INPUT_SIZE, OUTPUT_SIZE)
-    model.load_state_dict(torch.load(MODEL_PATH))
+    model = DQN(INPUT_SIZE, OUTPUT_SIZE).to(device)
+    best_model_path = get_best_model_path()
+    model.load_state_dict(torch.load(best_model_path, map_location=device))
     model.eval()
 
     # Setup game with rendering

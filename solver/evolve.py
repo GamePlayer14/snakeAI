@@ -7,10 +7,11 @@ from game.sprite_loader import load_sprites
 from game.screen_builder import buildScreen
 from reward_manager import RewardManager
 import copy
+from config import INPUT_SIZE, OUTPUT_SIZE
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 POP_SIZE = 100
-INPUT = 15  # 40x40 board + direction
-OUTPUT_SIZE = 3
 GENERATIONS = 100
 TOP_K = 20
 
@@ -124,7 +125,7 @@ def run_model(model, board_size, generation, epsilon = 0.0, base_step_limit=INIT
 def evolve_population_with_monitor(info_label, root, board_size):
     lx, ly = board_size
     total_size = lx*ly
-    population = [build_model(INPUT, OUTPUT_SIZE) for _ in range(POP_SIZE)]
+    population = [build_model(INPUT_SIZE, OUTPUT_SIZE).to(device) for _ in range(POP_SIZE)]
 
     for gen in range(GENERATIONS):
         epsilon = max(0, .5-(gen/(GENERATIONS*0.5)))
@@ -152,10 +153,10 @@ def evolve_population_with_monitor(info_label, root, board_size):
                 for param, new_param in zip(child.parameters(), new_weights):
                     param.copy_(new_param)
             mutate_weights(child, 0.3)
-            new_population.append(child)
+            new_population.append(child).to(device)
 
         while len(new_population) < POP_SIZE:
-            new_population.append(build_model(INPUT, OUTPUT_SIZE))
+            new_population.append(build_model(INPUT_SIZE, OUTPUT_SIZE)).to(device)
 
         population = new_population
         best_score = max(scores)

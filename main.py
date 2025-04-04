@@ -15,6 +15,11 @@ import tensorflow as tf
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # type: ignore
 import matplotlib.pyplot as plt # type: ignore
 from solver.reward_manager import RewardManager
+import torch
+from solver.train_dqn import get_best_model_path
+from solver.config import INPUT_SIZE, OUTPUT_SIZE
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def run_snake_game(mode: str, board_size, model_path = 'dqn_snake.pth'):
     if mode == "evolve":
@@ -37,8 +42,6 @@ def run_snake_game(mode: str, board_size, model_path = 'dqn_snake.pth'):
 
         RM = RewardManager(generation=0)
         RM.reset_distance(gs.snake[0], gs.apple)
-        INPUT_SIZE = 15
-        OUTPUT_SIZE = 3
 
         #  Train if model is missing
         if not os.path.exists(model_path):
@@ -46,8 +49,9 @@ def run_snake_game(mode: str, board_size, model_path = 'dqn_snake.pth'):
             from solver.train_dqn import train
             train()  # this should save dqn_snake.pth
 
-        model = DQN(INPUT_SIZE, OUTPUT_SIZE)
-        model.load_state_dict(torch.load("dqn_snake.pth"))
+        model = DQN(INPUT_SIZE, OUTPUT_SIZE).to(device)
+        best_model_path = get_best_model_path()
+        model.load_state_dict(torch.load(best_model_path, map_location=device))
         model.eval()
 
         root = tk.Tk()

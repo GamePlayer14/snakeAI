@@ -1,8 +1,11 @@
+
 import torch
 import torch.nn as nn
 import random
 from snake_ai_model import get_features
 from game.direction import turn_left, turn_right
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -32,9 +35,9 @@ def get_action(model, game_state, epsilon=0.0):
         move = random.randint(0, 2)
     else:
         with torch.no_grad():
-            features = torch.tensor(get_features(game_state), dtype=torch.float32).unsqueeze(0)
+            features = torch.tensor(get_features(game_state), dtype=torch.float32).unsqueeze(0).to(device)
             prediction = model(features)
-            print("Model Q-values (in get_action):", prediction.detach().numpy())   
+            print("Model Q-values (in get_action):", prediction.detach().cpu().numpy())   
             move = torch.argmax(prediction).item()
             print("Selected move:", move)
 

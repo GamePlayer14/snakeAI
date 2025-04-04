@@ -10,21 +10,22 @@ from snake_ai_model import get_features
 from game.game_state import GameState
 from game.sprite_loader import load_sprites
 from reward_manager import RewardManager
+import os
+from config import INPUT_SIZE, OUTPUT_SIZE
 
 # --- Hyperparameters ---
 BOARD_SIZE = (40, 40)
-INPUT_SIZE = 15   # or 15 if you're using the simplified get_features
-OUTPUT_SIZE = 3
 
 GAMMA = 0.9
 LR = 0.001
 BATCH_SIZE = 64
 MEMORY_SIZE = 10000
-MAX_EPISODES = 500
+MAX_EPISODES = 50000
 EPSILON_START = 1.0
 EPSILON_DECAY = 0.995
 EPSILON_MIN = 0.00
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Replay Buffer ---
 memory = deque(maxlen=MEMORY_SIZE)
@@ -37,13 +38,22 @@ def get_reward(prev_len, new_len, alive):
     return -0.1   # Time cost
 
 def train():
-    model = DQN(INPUT_SIZE, OUTPUT_SIZE)
+    MODEL_DIR = "saved models"
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    TOP_N = 10
+    best_score = 0
+    top_models = []
+    print("Running on:", device)
+
+    model = DQN(INPUT_SIZE, OUTPUT_SIZE).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LR)
     loss_fn = nn.MSELoss()
     epsilon = EPSILON_START
     episode_scores = []
     
-    
+    episodes_no_improve = 0
+    PATIENCE = 500  
+    mx = MAX_EPISODES
     for episode in range(1, MAX_EPISODES + 1):
 
         RM = RewardManager(generation = episode)
@@ -58,7 +68,7 @@ def train():
 
         while gs.alive:
             state = get_features(gs)
-            features = torch.tensor(get_features(gs), dtype=torch.float32).unsqueeze(0)
+            features = torch.tensor(get_features(gs), dtype=torch.float32).unsqueeze(0).to(device)
 
             if random.random() < epsilon:
                 move_idx = random.randint(0, 2)
@@ -77,18 +87,6 @@ def train():
             gs.set_direction(direction)
             gs.step()
             
-            # if random.random() < epsilon:
-            #     move_idx = random.randint(0, 2)
-            # else:
-            #     with torch.no_grad():
-            #         state_tensor = torch.tensor(get_features(gs), dtype=torch.float32).unsqueeze(0)
-            #         q_values = model(state_tensor)
-            #         move_idx = torch.argmax(q_values).item()
-
-            # # Apply the actual direction using move_idx
-            # direction = get_direction_from_idx(move_idx, gs.direction)  # <- you'll define this function
-            # gs.set_direction(direction)
-            # gs.step()
             if len(gs.snake) > prev_len:
                 RM.ate_apple()
 
@@ -105,11 +103,11 @@ def train():
                 batch = random.sample(memory, BATCH_SIZE)
                 s, a, r, s2, d = zip(*batch)
 
-                s = torch.tensor(s, dtype=torch.float32)
-                a = torch.tensor(a, dtype=torch.int64).unsqueeze(1)
-                r = torch.tensor(r, dtype=torch.float32).unsqueeze(1)
-                s2 = torch.tensor(s2, dtype=torch.float32)
-                d = torch.tensor(d, dtype=torch.float32).unsqueeze(1)
+                s = torch.tensor(s, dtype=torch.float32).to(device)
+                a = torch.tensor(a, dtype=torch.int64).unsqueeze(1).to(device)
+                r = torch.tensor(r, dtype=torch.float32).unsqueeze(1).to(device)
+                s2 = torch.tensor(s2, dtype=torch.float32).to(device)
+                d = torch.tensor(d, dtype=torch.float32).unsqueeze(1).to(device)
 
                 q_values = model(s).gather(1, a)
                 with torch.no_grad():
@@ -124,9 +122,52 @@ def train():
         epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY)
         episode_scores.append(len(gs.snake))
 
-        print(f"Ep {episode} | Score: {len(gs.snake)} | Steps: {steps} | Eps: {epsilon:.3f}")
+        score = len(gs.snake)
 
-    torch.save(model.state_dict(), "dqn_snake.pth")
+        if score > best_score:
+            model_filename = f"model_score{score}_ep{episode}.pth"
+            model_path = os.path.join(MODEL_DIR, model_filename)
+            torch.save(model.cpu().state_dict(), model_path)
+
+            model.to(device)
+
+            top_models.append((score, model_path))
+            top_models.sort(reverse=True)  # highest score first
+
+            # Keep only top N
+            if len(top_models) > TOP_N:
+                _, path_to_remove = top_models.pop()  # remove the worst
+                if os.path.exists(path_to_remove):
+                    os.remove(path_to_remove)
+                    print(f"🗑️ Removed old model: {path_to_remove}")
+
+            print(f"💾 Saved new top model: {model_path}")
+
+
+
+
+        score = len(gs.snake)
+        if score > best_score:
+            best_score = score
+            episodes_no_improve = 0
+            print('interest reset')
+        else:
+            episodes_no_improve += 1
+
+        if episodes_no_improve >= PATIENCE:
+            print(f"🛑 Early stopping: No improvement for {PATIENCE} episodes.")
+            episode = MAX_EPISODES
+
+
+        print(f"Ep {episode} | Score: {len(gs.snake)} | Steps: {steps} | Eps: {epsilon:.3f}")
+    
+    with open(os.path.join(MODEL_DIR, "top_models.txt"), "w") as f:
+        for score, m in top_models:
+            f.write(f"{score},{m}\n")
+
+
+    torch.save(top_models[0].cpu().state_dict(), "dqn_snake.pth")
+    model.to(device)
     print("✅ Training complete. Model saved to dqn_snake.pth")
 
 def get_direction_from_idx(idx, current_direction):
@@ -136,6 +177,21 @@ def get_direction_from_idx(idx, current_direction):
         return turn_left(current_direction)
     else:
         return turn_right(current_direction)
+    
+def get_best_model_path(model_dir="saved_models/top_models.txt"):
+    if not os.path.exists(model_dir):
+        return "dqn_snake.pth"  # fallback
+
+    with open(model_dir, "r") as f:
+        lines = f.readlines()
+
+    if not lines:
+        return "dqn_snake.pth"
+
+    # Line format: score, path
+    best_path = lines[0].strip().split(",")[1] if "," in lines[0] else lines[0].strip()
+    return best_path
+
     
 if __name__ == "__main__":
     train()
