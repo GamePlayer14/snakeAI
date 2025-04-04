@@ -45,7 +45,10 @@ def get_features(game_state):
         return not (0 <= y < height and 0 <= x < width)
 
     def is_body(y, x):
-        return board[y][x] == 1
+        if 0 <= y < board.shape[0] and 0 <= x < board.shape[1]:
+            return board[y][x] == 1
+        return False  # Out of bounds is definitely not body
+
 
     # Perception
     wall_ahead = float(is_wall(hy + dy, hx + dx))
