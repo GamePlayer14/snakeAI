@@ -1,0 +1,10 @@
+87,saved models/model_score87_ep3103.pth
+449,saved models/model_score449_ep7231.pth
+446,saved models/model_score446_ep7128.pth
+445,saved models/model_score445_ep7121.pth
+443,saved models/model_score443_ep7071.pth
+442,saved models/model_score442_ep7033.pth
+441,saved models/model_score441_ep7003.pth
+440,saved models/model_score440_ep6912.pth
+439,saved models/model_score439_ep6816.pth
+438,saved models/model_score438_ep6743.pth
