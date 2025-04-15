@@ -11,36 +11,42 @@ class RewardManager:
     def update_distance(self, head_pos, apple_pos):
         if self.prev_distance is None:
             return 0
-        new_distance = self._manhattan(head_pos, apple_pos)
-        delta = self.prev_distance - new_distance
-        self.prev_distance = new_distance
+        else:
+            new_dist = self._manhattan(head_pos, apple_pos)
+            delta = self.prev_distance - new_dist
+            if delta > 0:
+                self.total_reward += delta * 10  # only reward closing in
+            self.prev_distance = new_dist
+            return delta
 
-        if delta > 0:
-            self.total_reward += delta * 10
-        elif delta < 0:
-            self.total_reward += delta * 20 - self.apple_eaten * .01
+        # if delta > 0:
+        #     self.total_reward += delta * 10
+        # elif delta < 0:
+        #     self.total_reward += delta * 5 - self.apple_eaten * .01
 
-        return delta
+        
 
     def ate_apple(self):
         self.apple_eaten += 1
-        self.total_reward += 200
+        self.total_reward += 100 * self.apple_eaten
         return self.apple_eaten
 
     def loop_penalty(self, repeated_tiles):
-        self.total_reward -= repeated_tiles * 3
+        self.total_reward -= repeated_tiles * 0
         return repeated_tiles
 
     def survival_bonus(self, steps):
-        self.total_reward += steps * 0.01
+        self.total_reward += steps * 0
 
     def get_total(self):
         return self.total_reward
     
     def death_penalty(self, steps, length):
-        base_penalty = -10
-        scaled_penalty = -1 * length * .2  # tweak these
-        self.total_reward += min(base_penalty, scaled_penalty)
+        # base_penalty = -5
+        # scaled_penalty = -1 * length * .1  # tweak these
+        self.total_reward -= 100 + 100 * self.apple_eaten # min(base_penalty, scaled_penalty)
+        self.apple_eaten = 0 
+
 
     @staticmethod
     def _manhattan(p1, p2):

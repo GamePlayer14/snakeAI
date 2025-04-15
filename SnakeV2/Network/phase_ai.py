@@ -2,10 +2,10 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import random
-
-from Network.dqn_network import CustomNetwork, get_features
+from Network.dqn_network import ConvNetwork
+from Network.dqn_network import get_features
 from Game.direction import turn_left, turn_right
-from Network.config import INPUT_SIZE, OUTPUT_SIZE
+from Main.Config import INPUT_SIZE, OUTPUT_SIZE, BOARD_SIZE
 
 class PhaseAI:
     def __init__(self, input_size=INPUT_SIZE, output_size=OUTPUT_SIZE, model_paths=None):
@@ -14,8 +14,8 @@ class PhaseAI:
         self.recent_rewards = []  # for smoothing live reward
         self.reward_window = 10
         self.epsilon = 1.0
-        self.epsilon_min = 0.05
-        self.epsilon_decay = 0.995
+        self.epsilon_min = 0.01
+        self.epsilon_decay = 0.9999
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.output_size = output_size
         self.replay_buffer = []
@@ -27,9 +27,9 @@ class PhaseAI:
         self.output_size = output_size
 
         self.models = {
-            "early": CustomNetwork([input_size, 128, 64, output_size]).to(self.device),
-            "mid": CustomNetwork([input_size, 256, 128, 64, output_size]).to(self.device),
-            "late": CustomNetwork([input_size, 512, 256, 128, 64, output_size]).to(self.device)
+            "early": ConvNetwork(board_size=BOARD_SIZE, output_size=output_size).to(self.device),
+            "mid": ConvNetwork(board_size=BOARD_SIZE, output_size=output_size).to(self.device),
+            "late": ConvNetwork(board_size=BOARD_SIZE, output_size=output_size).to(self.device)
         }
 
         self.optimizers = {
@@ -123,28 +123,30 @@ class PhaseAI:
                 loss.backward()
                 optimizer.step()
 
-    def step_and_train(self, game, reward_manager):
+    def step_and_train(self, game, rm):
         prev_state = game.state()
+        prev_len = rm.apple_eaten
         direction, move_idx = self.get_action(prev_state, self.epsilon)
         self.hunger += 1
         game.step(direction)
         next_state = game.state()
+        reward = 0
 
-        reward_manager.update_distance(game.head(), game.apple())
-        if game.length() > len(prev_state.snake):
-            reward_manager.ate_apple()
+        rm.update_distance(game.head(), game.apple())
+        if rm.apple_eaten > prev_len:
+            rm.ate_apple()
             self.hunger = 0  # reset hunger when eating
 
         done = not game.alive()
-        if self.hunger >= self.hunger_limit:
-            done = True
-            reward_manager.total_reward -= 25  # penalty for starving
+        # if self.hunger >= self.hunger_limit:
+        #     done = True
+        #     reward -= 25  # penalty for starving
 
         if done:
-            reward_manager.death_penalty(len(prev_state.snake), game.length())
+            rm.death_penalty(len(prev_state.snake), game.length())
 
-        reward = reward_manager.get_total()
-        reward_manager.total_reward = 0
+        reward += rm.get_total()
+        rm.total_reward = 0
 
         state_array = get_features(prev_state)
         next_array = get_features(next_state)

@@ -24,8 +24,8 @@ class DQNTrainer:
 
         self.gamma = 0.9
         self.batch_size = 128
-        self.epsilon = 0.5
-        self.epsilon_decay = 0.995
+        self.epsilon = 1
+        self.epsilon_decay = 0.99
         self.epsilon_min = 0.05
         self.max_episodes = 50000
         self.patience = 500
@@ -102,7 +102,7 @@ class DQNTrainer:
                 RM.death_penalty(steps, game.length())
                 alive = False
 
-            self._store_experience(game, move_idx, RM)
+            # self._store_experience(game, move_idx, RM)
             total_reward += RM.get_total()
             RM.total_reward = 0
             steps += 1

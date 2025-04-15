@@ -1,7 +1,7 @@
 import tkinter as tk
 import random
 from .direction import DIRECTION_DELTAS, EAST
-
+from Main.Config import FIXED_LENGTH
 class GameState:
     def __init__(self, tiles, board_size, sprite_images, render):
         self.render = render
@@ -76,9 +76,16 @@ class GameState:
 
         self.snake.insert(0, new_head)
 
-        if new_head == self.apple:
-            self.spawn_apple()
+        if not FIXED_LENGTH:
+            if new_head == self.apple:
+                self.spawn_apple()
+            else:
+                tail_y, tail_x = self.snake.pop()
+                if self.render:
+                    self.tiles[tail_y][tail_x].delete("all")
         else:
+            if new_head == self.apple:
+                self.spawn_apple()
             tail_y, tail_x = self.snake.pop()
             if self.render:
                 self.tiles[tail_y][tail_x].delete("all")

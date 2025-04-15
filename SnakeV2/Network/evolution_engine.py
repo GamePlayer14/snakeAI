@@ -4,7 +4,7 @@ import numpy as np
 
 from Network.dqn_network import CustomNetwork
 from Network.reward_manager import RewardManager
-from Network.config import INPUT_SIZE, OUTPUT_SIZE
+from Main.Config import INPUT_SIZE, OUTPUT_SIZE
 from Game.snake_game import SnakeGame
 from Game.screen_builder import create_monitor, update_monitor
 
