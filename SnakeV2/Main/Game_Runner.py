@@ -6,11 +6,13 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from Game import screen_builder as sb
 from Network.reward_manager import RewardManager
-from Network.phase_ai import PhaseAI
-from Main.Config import INPUT_SIZE, OUTPUT_SIZE, SQUARE_COUNT
+from Network.dqn_network import ConvNetwork
+from Main.Config import INPUT_SIZE, OUTPUT_SIZE, SQUARE_COUNT, BOARD_SIZE
 from Game.snake_game import SnakeGame
 from Network.evolution_engine import EvolutionEngine
 from Network.dqn_network import get_features
+from Game.direction import turn_left, turn_right
+from Network.single_ai import SingleAI
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -85,7 +87,8 @@ class SnakeGameRunner:
         self.game = SnakeGame(self.board_size, render=True, tiles=self.tiles, master=self.root)
 
     def load_model(self):
-        self.model = PhaseAI()
+        self.model = SingleAI()
+
 
     def run_manual(self):
         self.game.bind_controls(self.root)
@@ -103,45 +106,44 @@ class SnakeGameRunner:
         self.root.mainloop()
 
     def run_model(self):
+
         self.load_model()
         self.reward_manager = RewardManager(generation=0)
-        self.reward_manager.reset_distance(self.game.head(), self.game.apple())
         self.plotter = LivePlotter(self.root)
+        self.game.reset()
+        self.reward_manager.reset_distance(self.game.head(), self.game.apple())
 
         def loop():
             while True:
                 reward = self.model.step_and_train(self.game, self.reward_manager)
 
-                # handle reset logic, counters, plotting...
                 if not self.game.alive():
-                    self.total_apples += self.game.length() - 3  # apples eaten
+                    self.total_apples += self.game.length() - 3
                     self.games_played += 1
-                    self.reward_manager.loop_penalty(10)
-                    self.game.reset(length = SQUARE_COUNT//2)
+                    self.game.reset()
                     self.reward_manager.reset_distance(self.game.head(), self.game.apple())
-                    
 
                 self.step_counter += 1
                 self.reward_manager.update_distance(self.game.head(), self.game.apple())
-
                 self.total_reward += reward
-                
+
                 if self.step_counter % 1000 == 0:
-                    avg = self.total_apples / min(1,self.games_played)
-                    print(self.model.epsilon)
-                    self.plotter.update(self.step_counter, self.total_reward/1000, avg)
+                    avg = self.total_apples / max(1, self.games_played)
+                    print(f"Step: {self.step_counter} | Eps: {self.model.epsilon:.3f}")
+                    self.plotter.update(self.step_counter, self.total_reward / 1000, avg)
                     self.total_reward = 0
                     self.total_apples = 0
                     self.games_played = 0
 
+                self.root.update()
 
-                self.root.update()  # FAST manual screen refresh
-
-
-        self.game.reset()
         tk.Button(self.root, text="Reset", command=self.game.reset).pack()
         loop()
         self.root.mainloop()
+
+
+
+
 
     def run(self):
         if self.mode == 'evolve':

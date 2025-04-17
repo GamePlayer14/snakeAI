@@ -6,18 +6,18 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
-from Network.dqn_network import CustomNetwork, get_features
+from Network.dqn_network import ConvNetwork, get_features
 from Network.reward_manager import RewardManager
-from Main.Config import INPUT_SIZE, OUTPUT_SIZE
+from Main.Config import INPUT_SIZE, OUTPUT_SIZE, BOARD_SIZE
 from Game.snake_game import SnakeGame
 from Game.direction import turn_left, turn_right
 
 
 class DQNTrainer:
-    def __init__(self, board_size=(40, 40)):
+    def __init__(self, board_size=BOARD_SIZE):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.board_size = board_size
-        self.model = CustomNetwork([INPUT_SIZE, 512, 256, 128, OUTPUT_SIZE]).to(self.device)
+        self.model = ConvNetwork([BOARD_SIZE, OUTPUT_SIZE]).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         self.loss_fn = nn.MSELoss()
         self.memory = deque(maxlen=10000)

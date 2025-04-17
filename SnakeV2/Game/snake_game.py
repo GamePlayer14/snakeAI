@@ -2,6 +2,7 @@ import random
 from Game.game_state import GameState
 from Game.sprite_loader import load_sprites
 from Game.direction import EAST
+from Game.controls import bind_controls
 
 class SnakeGame:
     def __init__(self, board_size=(40, 40), render=True, tiles=None, master=None):
@@ -39,5 +40,4 @@ class SnakeGame:
         return self.gs
 
     def bind_controls(self, root):
-        from controls import bind_controls
         bind_controls(root, self.gs)

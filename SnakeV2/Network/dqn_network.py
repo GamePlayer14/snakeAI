@@ -6,6 +6,7 @@ import numpy as np
 import random
 from Game.direction import DIRECTION_DELTAS, turn_left, turn_right
 from Main.Config import USE_FULL_BOARD
+from Network.pathfinding_heatmap import compute_path_distances
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -98,37 +99,46 @@ def get_features(game_state):
     else:
         height, width = game_state.board_size
 
-        # 2 separate layers: snake body and apple
-        snake_layer = np.zeros((height, width), dtype=np.float32)
-        apple_layer = np.zeros((height, width), dtype=np.float32)
+        # === Snake distance layer (from snake head) ===
+        def is_blocked_snake(y, x):
+            return False
 
-        for y, x in game_state.snake:
-            snake_layer[y][x] = 1.0
+        snake_dist = compute_path_distances(game_state.snake[0], is_blocked_snake, game_state.board_size)
+        snake_layer = 1.0 / (snake_dist + 1)
+        snake_layer[np.isinf(snake_layer)] = 0.0
 
-        ay, ax = game_state.apple
-        hx, hy = game_state.snake[0][1], game_state.snake[0][0]
-        apple_layer[ay][ax] = 10.0
+        # === Apple distance layer ===
+        def is_snake(y, x):
+            return (y, x) in game_state.snake
 
-        snake_layer[hy][hx] = 2.0
+        apple_dist = compute_path_distances(game_state.apple, is_snake, game_state.board_size)
+        apple_layer = 1.0 / (apple_dist + 1)
+        apple_layer[np.isinf(apple_layer)] = 0.0
 
-        # Flatten both layers and stack them
-        flat_snake = snake_layer.flatten()
-        flat_apple = apple_layer.flatten()
+        # === Slime trail layer ===
+        trail_layer = game_state.trail_map.copy()
 
-        # Add direction one-hot
+        # === Stack all 3 channels: [snake, apple, trail] ===
+        stacked = np.stack([snake_layer, apple_layer, trail_layer], axis=0)  # shape: [3, H, W]
+        flat_spatial = stacked.flatten()
+
+        # === Extra vector input (7 features) ===
         direction = game_state.direction
         dir_encoding = [0.0] * 4
         dir_encoding[direction] = 1.0
 
+        hx, hy = game_state.snake[0][1], game_state.snake[0][0]
+        ax, ay = game_state.apple[1], game_state.apple[0]
+
         apple_dx = (ax - hx) / width
         apple_dy = (ay - hy) / height
-
-
-        # Add normalized snake length
         length_norm = len(game_state.snake) / (height * width)
 
-        # Combine all features
-        return np.array(list(flat_snake) + list(flat_apple) + dir_encoding + [length_norm, apple_dx, apple_dy], dtype=np.float32)
+        extras = dir_encoding + [length_norm, apple_dx, apple_dy]
+
+        # === Final flat input ===
+        return np.array(list(flat_spatial) + extras, dtype=np.float32)
+        
 
 
 
@@ -147,30 +157,41 @@ def get_action(model, game_state, epsilon=0.0):
     return [direction, turn_left(direction), turn_right(direction)][move]
 
 class ConvNetwork(nn.Module):
-    def __init__(self, board_size, output_size):
+    def __init__(self, board_size, output_size, in_channels=2):
         super().__init__()
+        self.in_channels = in_channels
         height, width = board_size
+        self.height = height
+        self.width = width
 
         self.conv = nn.Sequential(
-            nn.Conv2d(2, 16, kernel_size=3, padding=1),  # input: 2xHxW
+            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Flatten()
         )
 
-        conv_output_size = 32 * height * width
+        conv_output_size = 64 * height * width
         self.fc = nn.Sequential(
-            nn.Linear(conv_output_size + 7, 128),
+            nn.Linear(conv_output_size + 7, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, output_size)
         )
 
     def forward(self, x):
-        flat_len = x.size(1) - 7  # exclude the 7 extras
-        side = int((flat_len / 2) ** 0.5)  # √(length of one channel)
-        spatial = x[:, :-7].reshape(x.size(0), 2, side, side)
-        extra = x[:, -7:]  # direction one-hot + length + dx + dy
+        batch_size = x.size(0)
+        flat_len = x.size(1) - 7  # exclude direction/length/dx/dy
+        expected_spatial = self.in_channels * self.height * self.width
+
+        assert flat_len == expected_spatial, \
+            f"Expected spatial size {expected_spatial}, got {flat_len}"
+
+        spatial = x[:, :-7].reshape(batch_size, self.in_channels, self.height, self.width)
+        extras = x[:, -7:]
         conv_out = self.conv(spatial)
-        return self.fc(torch.cat([conv_out, extra], dim=1))
+        return self.fc(torch.cat([conv_out, extras], dim=1))
+
 

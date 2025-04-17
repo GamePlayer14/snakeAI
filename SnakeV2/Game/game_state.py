@@ -1,5 +1,5 @@
-import tkinter as tk
 import random
+import numpy as np
 from .direction import DIRECTION_DELTAS, EAST
 from Main.Config import FIXED_LENGTH
 class GameState:
@@ -13,9 +13,11 @@ class GameState:
         self.next_directions = []
         self.apple = None
         self.alive = True
+        self.trail_map = np.zeros(self.board_size, dtype=np.float32)
         self.reset()
 
     def reset(self, starting_length=3):
+        self.trail_map = np.zeros(self.board_size, dtype=np.float32)
         self.clear_tiles()
         self.snake.clear()
         self.next_directions.clear()
@@ -48,6 +50,7 @@ class GameState:
             return
         self.apple = random.choice(open_tiles)
         self.draw_tile(*self.apple, self.sprite_images['apple'])
+        self.trail_map = np.zeros(self.board_size, dtype=np.float32)
 
     def draw_tile(self, y, x, image):
         if self.render and self.tiles is not None:
@@ -58,6 +61,9 @@ class GameState:
     def step(self):
         if not self.alive:
             return
+            
+        head_y, head_x = self.snake[0]
+        self.trail_map[head_y][head_x] = 1.0
 
         if self.next_directions:
             new_dir = self.next_directions.pop(0)
