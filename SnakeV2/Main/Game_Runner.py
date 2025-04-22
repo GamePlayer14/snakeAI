@@ -42,8 +42,8 @@ class LivePlotter:
         self.ax2.cla()
 
         # Plot raw data (faint lines)
-        self.ax.plot(x, y1, label="Reward", color='green', alpha=0.3)
-        self.ax2.plot(x, y2, label="Avg Apples", color='orange', alpha=0.3)
+        self.ax.plot(x, y1, label="", color='green', alpha=0.3)
+        self.ax2.plot(x, y2, label="", color='orange', alpha=0.3)
 
         # Plot trend lines (polynomial regression)
         if len(x) >= 5:
@@ -53,13 +53,7 @@ class LivePlotter:
             self.ax2.plot(x, apple_trend(x), label="Apple Trend", color='orange', linewidth=2)
 
         self.ax.set_title("Live Reward")
-        self.ax.set_xlabel("Step")
-        self.ax.set_ylabel("Reward")
         self.ax.grid(True)
-        self.ax.legend(loc="upper left")
-
-        self.ax2.set_ylabel("Avg Apples")
-        self.ax2.legend(loc="upper right")
 
         self.canvas.draw()
 

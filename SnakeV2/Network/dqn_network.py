@@ -136,6 +136,7 @@ def get_features(game_state):
 
         extras = dir_encoding + [length_norm, apple_dx, apple_dy]
 
+
         # === Final flat input ===
         return np.array(list(flat_spatial) + extras, dtype=np.float32)
         

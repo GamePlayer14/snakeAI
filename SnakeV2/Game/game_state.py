@@ -63,7 +63,7 @@ class GameState:
             return
             
         head_y, head_x = self.snake[0]
-        self.trail_map[head_y][head_x] = 1.0
+        self.trail_map[head_y][head_x] += 1.0
 
         if self.next_directions:
             new_dir = self.next_directions.pop(0)
@@ -71,7 +71,6 @@ class GameState:
                 self.direction = new_dir
 
         dy, dx = DIRECTION_DELTAS[self.direction]
-        head_y, head_x = self.snake[0]
         new_head = (head_y + dy, head_x + dx)
 
         if (not (0 <= new_head[0] < self.board_size[0]) or

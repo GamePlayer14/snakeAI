@@ -12,13 +12,15 @@ class SingleAI:
         self.model = ConvNetwork(board_size=BOARD_SIZE, output_size=OUTPUT_SIZE, in_channels=3).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.replay_buffer = []
-        self.buffer_limit = 10000
-        self.batch_size = 128
+        self.buffer_limit = 5000
+        self.batch_size = 64
         self.gamma = 0.9
-        self.epsilon = 0
-        self.epsilon_min = 0
+        self.epsilon = 1
+        self.epsilon_min = 0.01
         self.epsilon_decay = 0.9995
         self.train_counter = 0
+        self.steps = 0
+        self.steps_since_apple = 0
 
     def get_action(self, game_state):
         
@@ -38,54 +40,71 @@ class SingleAI:
         reward_manager.update_distance(game.head(), game.apple())
 
         game.step(direction)
+        self.steps += 1
+        self.steps_since_apple += 1
+
+        if game.head() in reward_manager.seen_squares:
+            game.state().alive = False
 
         if game.length() > prev_len:
             reward_manager.ate_apple()
+            self.steps_since_apple = 0
 
         done = not game.alive()
         if done:
             reward_manager.death_penalty(len(state.snake), game.length())
+            self.steps = 0
+            self.steps_since_apple = 0
+
+        reward_manager.survival_bonus(self.steps)
+        reward_manager.hunger_penalty(self.steps_since_apple)
 
         reward = reward_manager.get_total()
         reward_manager.total_reward = 0
 
         next_state = game.state()
+        importance = 2.0 if reward >= 100 or done else 1.0  # prioritize apples & deaths
         self.replay_buffer.append((
             get_features(state),
             action_idx,
             reward,
             get_features(next_state),
-            done
+            done,
+            importance
         ))
+
 
         if len(self.replay_buffer) > self.buffer_limit:
             self.replay_buffer.pop(0)
 
-        self.train_step()
+        self.train_step(reward_manager)
 
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
         return reward
 
-    def train_step(self):
-        if len(self.replay_buffer) < self.batch_size:
+    def train_step(self, rm):
+        if len(self.replay_buffer) < self.buffer_limit/10:
             return
 
         # 🔄 Sample from full buffer for better training diversity
         batch = random.sample(self.replay_buffer, self.batch_size)
-        s, a, r, s2, d = zip(*batch)
+        s, a, r, s2, d, w = zip(*batch)
 
         s = torch.tensor(s, dtype=torch.float32).to(device)
         a = torch.tensor(a, dtype=torch.int64).unsqueeze(1).to(device)
         r = torch.tensor(r, dtype=torch.float32).unsqueeze(1).to(device)
         s2 = torch.tensor(s2, dtype=torch.float32).to(device)
         d = torch.tensor(d, dtype=torch.float32).unsqueeze(1).to(device)
+        w = torch.tensor(w, dtype=torch.float32).unsqueeze(1).to(device)
 
+        
         q_pred = self.model(s).gather(1, a)
         with torch.no_grad():
             q_next = self.model(s2).max(1)[0].unsqueeze(1)
             q_target = r + self.gamma * q_next * (1 - d)
-
-        loss = F.mse_loss(q_pred, q_target)
+        print(q_pred)
+        loss = F.mse_loss(q_pred, q_target, reduction='none')
+        loss = (loss * w).mean()
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
