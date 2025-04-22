@@ -21,14 +21,13 @@ class RewardManager:
             new_dist = self._manhattan(head_pos, apple_pos)
             delta = self.prev_distance - new_dist
             self.distance = new_dist
-            self.total_reward += delta * 3 + 1
+            # self.total_reward += delta * 3 + 1
             self.prev_distance = new_dist
             return delta
 
     def exploration_check(self, pos):
         if pos in self.seen_squares:
-            self.total_reward -= min(0, 2 * self.seen_squares.count(pos))
-            self.seen_squares.append(pos)
+            # self.total_reward -= min(0, 2 * self.seen_squares.count(pos))
             return False
         else:
             self.total_reward += 0
@@ -42,7 +41,7 @@ class RewardManager:
 
     def ate_apple(self):
         self.apple_eaten += 1
-        self.total_reward += 100
+        self.total_reward += 1
         self.exploration_reset()
         return self.apple_eaten
 
@@ -51,23 +50,27 @@ class RewardManager:
         return repeated_tiles
 
     def survival_bonus(self, steps):
-        self.total_reward += steps * 0.1
+        self.total_reward += 0.1
 
     def hunger_penalty(self, steps):
-        self.total_reward -= min(10, max(0, 2 * (steps - 100)))
+        self.total_reward -= 0 #min(10, max(0, 2 * (steps - 100)))
 
     def get_total(self):
         return max(-100, self.total_reward)
     
-    def death_penalty(self, steps, length):
+    def death_penalty(self):
         # base_penalty = -5
         # scaled_penalty = -1 * length * .1  # tweak these
-        self.total_reward -= 30
+        self.total_reward -= 10
         self.apple_eaten = 0 
         self.exploration_reset()
 
     def get_distance(self):
         return self.distance
+    
+    def line_reward(self, move_idx, last_move_idx):
+        if move_idx != last_move_idx:
+            self.total_reward += 0
 
 
     @staticmethod

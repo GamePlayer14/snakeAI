@@ -139,10 +139,6 @@ def get_features(game_state):
 
         # === Final flat input ===
         return np.array(list(flat_spatial) + extras, dtype=np.float32)
-        
-
-
-
 
 def get_action(model, game_state, epsilon=0.0):
     model.eval()
@@ -175,11 +171,11 @@ class ConvNetwork(nn.Module):
 
         conv_output_size = 64 * height * width
         self.fc = nn.Sequential(
-            nn.Linear(conv_output_size + 7, 256),
+            nn.Linear(conv_output_size + 7, 128),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(128, output_size)
+            nn.Linear(64, output_size)
         )
 
     def forward(self, x):

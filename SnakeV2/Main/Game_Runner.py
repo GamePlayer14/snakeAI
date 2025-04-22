@@ -123,7 +123,7 @@ class SnakeGameRunner:
 
                 if self.step_counter % 1000 == 0:
                     avg = self.total_apples / max(1, self.games_played)
-                    print(f"Step: {self.step_counter} | Eps: {self.model.epsilon:.3f}")
+                    # print(f"Step: {self.step_counter} | Eps: {self.model.epsilon:.3f}")
                     self.plotter.update(self.step_counter, self.total_reward / 1000, avg)
                     self.total_reward = 0
                     self.total_apples = 0

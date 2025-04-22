@@ -131,3 +131,33 @@ class GameState:
     def ai_step(self, direction):
         self.set_direction(direction)
         self.step()
+
+    def get_state(self):
+        return {
+            'snake': self.snake.copy(),
+            'direction': self.direction,
+            'next_directions': self.next_directions.copy(),
+            'apple': self.apple,
+            'alive': self.alive,
+            'trail_map': self.trail_map.copy(),
+        }
+
+    def set_state(self, state):
+        self.clear_tiles()
+        self.snake = state['snake'].copy()
+        self.direction = state['direction']
+        self.next_directions = state['next_directions'].copy()
+        self.apple = state['apple']
+        self.alive = state['alive']
+        self.trail_map = state['trail_map'].copy()
+
+        # Redraw tiles for snake
+        for y, x in self.snake:
+            self.draw_tile(y, x, self.sprite_images['snakeHorz'])
+
+        # Redraw apple
+        if self.apple:
+            self.draw_tile(*self.apple, self.sprite_images['apple'])
+
+        # Redraw head and neck (for sprite accuracy)
+        self.redraw_head_and_neck()
