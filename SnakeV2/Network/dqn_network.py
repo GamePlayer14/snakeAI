@@ -4,8 +4,9 @@ import torch.nn.functional as F
 import copy
 import numpy as np
 import random
+import os
 from Game.direction import DIRECTION_DELTAS, turn_left, turn_right
-from Main.Config import USE_FULL_BOARD
+from Main.Config import USE_FULL_BOARD, BOARD_SIZE
 from Network.pathfinding_heatmap import compute_path_distances
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -154,24 +155,27 @@ def get_action(model, game_state, epsilon=0.0):
     return [direction, turn_left(direction), turn_right(direction)][move]
 
 class ConvNetwork(nn.Module):
-    def __init__(self, board_size, output_size, in_channels=2):
+    def __init__(self, board_size, output_size, in_channels=3, use_pretrained_encoder=False):
         super().__init__()
         self.in_channels = in_channels
         height, width = board_size
-        self.height = height
-        self.width = width
+        flat_size = in_channels * height * width  # 3 × 10 × 10 = 300
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Flatten()
+        # Encoder: flatten board → 256-dim
+        self.encoder = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(flat_size, 256),
+            nn.ReLU()
         )
 
-        conv_output_size = 64 * height * width
+        # Optional: load pretrained FC encoder
+        if use_pretrained_encoder:
+            encoder_path = os.path.join(os.path.dirname(__file__), "saved_encoder_fc.pth")
+            self.encoder.load_state_dict(torch.load(encoder_path, map_location=device))
+
+        # FC head: [encoded + extras(7)] → action logits
         self.fc = nn.Sequential(
-            nn.Linear(conv_output_size + 7, 128),
+            nn.Linear(256 + 7, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -179,16 +183,10 @@ class ConvNetwork(nn.Module):
         )
 
     def forward(self, x):
-        batch_size = x.size(0)
-        flat_len = x.size(1) - 7  # exclude direction/length/dx/dy
-        expected_spatial = self.in_channels * self.height * self.width
-
-        assert flat_len == expected_spatial, \
-            f"Expected spatial size {expected_spatial}, got {flat_len}"
-
-        spatial = x[:, :-7].reshape(batch_size, self.in_channels, self.height, self.width)
+        flat_len = x.size(1) - 7
+        board = x[:, :-7].reshape(x.size(0), self.in_channels, *BOARD_SIZE)
         extras = x[:, -7:]
-        conv_out = self.conv(spatial)
-        return self.fc(torch.cat([conv_out, extras], dim=1))
 
-
+        encoded = self.encoder(board)              # [B, 256]
+        out = self.fc(torch.cat([encoded, extras], dim=1))  # [B, output_size]
+        return out

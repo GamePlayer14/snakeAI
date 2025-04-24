@@ -1,22 +1,22 @@
 import torch
 import torch.nn.functional as F
 import random
-from Network.dqn_network import ConvNetwork, get_features
+from Network.dqn_network import ConvNetwork, CustomNetwork, get_features
 from Game.direction import turn_left, turn_right
-from Main.Config import BOARD_SIZE, OUTPUT_SIZE
+from Main.Config import INPUT_SIZE, BOARD_SIZE, OUTPUT_SIZE
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class SingleAI:
     def __init__(self):
-        self.model = ConvNetwork(board_size=BOARD_SIZE, output_size=OUTPUT_SIZE, in_channels=3).to(device)
+        self.model = ConvNetwork(BOARD_SIZE, OUTPUT_SIZE, in_channels=3, use_pretrained_encoder=True).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.replay_buffer = []
         self.buffer_limit = 5000
         self.batch_size = 64
         self.gamma = 0.9
-        self.epsilon = 0.01
-        self.epsilon_min = 0
+        self.epsilon = 1
+        self.epsilon_min = 0.01
         self.epsilon_decay = 0.9995
         self.train_counter = 0
         self.steps = 0
@@ -57,8 +57,8 @@ class SingleAI:
         self.steps += 1
         self.steps_since_apple += 1
 
-        if game.head() in reward_manager.seen_squares:
-            game.state().alive = False
+        # if game.head() in reward_manager.seen_squares:
+        #     game.state().alive = False
 
         if game.length() > prev_len:
             reward_manager.ate_apple()
@@ -167,14 +167,14 @@ class SingleAI:
             q_next = self.model(s2).max(1)[0].unsqueeze(1)
             q_target = r + self.gamma * q_next * (1 - d)
 
-        # 🔥 Entropy bonus to encourage diverse action selection
+        # Entropy bonus to encourage diverse action selection
         with torch.no_grad():
             q_all = self.model(s)
             probs = F.softmax(q_all, dim=1)
             entropy = -torch.sum(probs * torch.log(probs + 1e-8), dim=1, keepdim=True)  # shape: [batch, 1]
         
         # Scale and add entropy to target reward (alternatively add to q_target directly)
-        q_target += 0.01 * entropy  # small bonus for uncertainty
+        # q_target += 0.01 * entropy  # small bonus for uncertainty
 
         # Loss with weights
         loss = F.mse_loss(q_pred, q_target, reduction='none')
