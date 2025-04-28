@@ -80,7 +80,22 @@ class SnakeGameRunner:
         self.game = SnakeGame(self.board_size, render=True, tiles=self.tiles, master=self.root)
 
     def load_model(self):
-        self.model = SingleAI()
+
+        import os
+
+        folder_path = "C:\\Users\\Tyler\\python_code\\Final_Project\\Snake Real\\SnakeV2\\Network"
+        print('seen')
+        try:
+            files = os.listdir(folder_path)
+            for file in files:
+                print(file)  # Prints each file name in the folder
+                if file == 'first_working_model.pth':
+                    self.model = file
+
+        except FileNotFoundError:
+            print(f"The directory '{folder_path}' was not found.")
+        except NotADirectoryError:
+            print(f"'{folder_path}' is not a directory.")
 
 
     def run_manual(self):
