@@ -9,7 +9,6 @@ from Network.reward_manager import RewardManager
 from Network.dqn_network import ConvNetwork
 from Main.Config import INPUT_SIZE, OUTPUT_SIZE, SQUARE_COUNT, BOARD_SIZE
 from Game.snake_game import SnakeGame
-from Network.evolution_engine import EvolutionEngine
 from Network.dqn_network import get_features
 from Game.direction import turn_left, turn_right
 from Network.single_ai import SingleAI
@@ -140,11 +139,8 @@ class SnakeGameRunner:
 
 
     def run(self):
-        if self.mode == 'evolve':
-            EvolutionEngine(self.board_size).evolve()
+        self.setup_gui()
+        if self.mode == 'model':
+            self.run_model()
         else:
-            self.setup_gui()
-            if self.mode == 'model':
-                self.run_model()
-            else:
-                self.run_manual()
+            self.run_manual()
