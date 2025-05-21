@@ -3,6 +3,7 @@ import sys
 import threading
 import tkinter as tk
 import numpy as np
+<<<<<<< HEAD:SnakeV1/main.py
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -21,12 +22,20 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def run_snake_game(mode: str, board_size, model_path='dqn_snake.pth'):
     if mode == "evolve":
+=======
+import tensorflow as tf
+
+def run_snake_game(play_game: bool, board_size):
+    # Headless Evolution Monitor
+    if not play_game:
+>>>>>>> parent of 696af33 (started DQL):main.py
         root = tk.Tk()
         root.title("Evolution Monitor")
         info_label = tk.Label(root, text="Initializing...", font=("Arial", 14))
         info_label.pack()
         evo.evolve_population_with_monitor(info_label, root, board_size)
         return
+<<<<<<< HEAD:SnakeV1/main.py
 
     root, tiles = sb.buildScreen(board_size)
     sprites = load_sprites(True, master=root)
@@ -109,3 +118,46 @@ def run_snake_game(mode: str, board_size, model_path='dqn_snake.pth'):
     tk.Button(root, text="Reset", command=gs.reset).pack()
     game_loop()
     root.mainloop()
+=======
+    
+    # Game Mode (with GUI)
+    tiles = None
+
+    if play_game:
+        root, tiles = sb.buildScreen(*board_size)
+        sprites = load_sprites(play_game, master=root)
+    else:
+        root = tk.Tk()
+        root.withdraw()
+        sprites = load_sprites(play_game, master=root)
+
+    gs = GameState(tiles, board_size, sprites, play_game)
+
+    # def headless_loop():
+    #     generation = 1
+    #     best_score = 0
+    #     gs.reset()
+
+    #     while gs.alive:
+    #         gs.step()
+    #         score = len(gs.snake)
+    #         if score > best_score:
+    #             best_score = score
+    #         sb.update_monitor(generation, best_score, info_label, root)
+
+    def game_loop():
+        try:
+            gs.step()
+            root.after(100, game_loop)
+        except tk.TclError:
+            print("Window closed. Stopping game.")
+
+    if play_game:
+        bind_controls(root, gs)
+        gs.reset()
+        reset_button = tk.Button(root, text="Reset", command=gs.reset)
+        reset_button.pack()
+        game_loop()
+
+    root.mainloop()
+>>>>>>> parent of 696af33 (started DQL):main.py
